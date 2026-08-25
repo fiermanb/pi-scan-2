@@ -1,0 +1,5 @@
+include INSTALL.md
+include CHANGELOG.md
+include MIGRATION.md
+include RELEASE_CHECKLIST.md
+recursive-include deploy *

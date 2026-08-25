@@ -1,0 +1,56 @@
+name: Python 3.13 rewrite
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install rewrite and development tools
+        run: python -m pip install -e ".[dev]"
+      - name: Lint Python 3 rewrite
+        run: ruff check src tests
+      - name: Check Python formatting
+        run: ruff format --check src tests
+      - name: Strict type check
+        run: pyright
+      - name: Validate appliance installer syntax
+        run: sh -n deploy/install.sh
+      - name: Test
+        run: python -W error -m pytest --cov=pi_scan --cov-report=term-missing -q
+      - name: Compile
+        run: python -m compileall -q src/pi_scan tests
+      - name: Build release artifacts
+        run: python -m build
+      - name: Verify source distribution contents
+        run: |
+          tar -tzf dist/*.tar.gz | grep -q '/deploy/install.sh$'
+          tar -tzf dist/*.tar.gz | grep -q '/deploy/pi-scan.service$'
+          tar -tzf dist/*.tar.gz | grep -q '/MIGRATION.md$'
+          tar -tzf dist/*.tar.gz | grep -q '/INSTALL.md$'
+      - name: Smoke-test installed wheel
+        run: |
+          python -m pip install --force-reinstall --no-deps dist/*.whl
+          pi-scan-sim --output wheel-smoke-scans --pairs 1 --dng --quiet
+          test -s wheel-smoke-scans/0000.jpg
+          test -s wheel-smoke-scans/0000.dng
+          test -s wheel-smoke-scans/0001.jpg
+          test -s wheel-smoke-scans/0001.dng
+      - name: Smoke-test installed source distribution
+        run: |
+          python -m pip install --force-reinstall --no-deps dist/*.tar.gz
+          pi-scan-sim --output sdist-smoke-scans --pairs 1 --dng --quiet
+          test -s sdist-smoke-scans/0000.jpg
+          test -s sdist-smoke-scans/0000.dng
+          test -s sdist-smoke-scans/0001.jpg
+          test -s sdist-smoke-scans/0001.dng

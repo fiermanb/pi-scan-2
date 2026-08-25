@@ -1,0 +1,4 @@
+# CHDK Canon devices and cameras identified by libgphoto2.
+# Access is limited to members of the dedicated pi-scan group.
+SUBSYSTEM=="usb", ATTR{idVendor}=="04a9", GROUP="pi-scan", MODE="0660", TAG+="uaccess"
+SUBSYSTEM=="usb", ENV{ID_GPHOTO2}=="1", GROUP="pi-scan", MODE="0660", TAG+="uaccess"

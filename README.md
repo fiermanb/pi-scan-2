@@ -1,190 +1,225 @@
-# Pi Scan Overview
+# Pi Scan 2 Overview
 
-Pi Scan is a simple and robust camera controller for book scanners. It was designed to work with the [Archivist book scanner](http://diybookscanner.org/archivist). For questions or help, visit the [forum](http://diybookscanner.org/forum) or email help at tenrec dot builders.
+Pi Scan is a camera controller for dual-camera book scanners. It locates two cameras, maintains their odd and even page assignments, captures both pages simultaneously, and writes the results to removable storage in reading order. It was originally made for the Archivist book scanner from the DIY Book Scanner community, but nothing in the software requires that particular frame.
 
-## Translations: [Espanol](https://github.com/Tenrec-Builders/pi-scan/blob/master/README.es.md)
+Pi Scan 2 is a rewrite of the original appliance. The old program was tied to Python 2 and an aging Raspberry Pi image. This version keeps the scanning workflow and the useful parts of the old configuration format, but runs as an ordinary Python application that can be installed and updated without rebuilding an operating-system image.
 
-# Requirements
+Pi Scan is a machine controller rather than a general camera application. It expects exactly two cameras and one removable scan disk, and it assumes the cameras are mounted over the left and right pages of an open book. Within that scope there are correspondingly fewer decisions to make while scanning.
 
-* Raspberry Pi 2 or Raspberry Pi 3
-* Two cameras (Canon PowerShot A2500 or Canon PowerShot ELPH 160 (aka IXUS 160) or Nikon 1 J5)
-* Three 4GB SD Cards (2 for cameras, 1 for Pi). One needs to be micro (for the Pi). The other two need to be standard sized or have adapters.
-* USB Storage device (either an SD Card Reader and fast SD Card or a thumb drive)
-* Input Devices (see below
+## Requirements
 
-# Input Device Options
+For a working scanner you need:
 
-If at all possible, avoid using a USB hub. A significant chunk of issues that users have reported ended up being caused by some issue with a USB hub that was resolved when plugging devices into the Raspberry Pi directly.
+* A Raspberry Pi or similar Linux computer with an X11 desktop session
+* Two supported cameras and their USB cables
+* `chdkptp`, which the installer requires whichever cameras are used, and CHDK on each
+  Canon compact camera
+* A USB stick, USB hard disk, or card reader for the scanned pages
+* A screen and at least one input device
+* Python with virtual-environment support
+* `udisks2` and `lsblk` for finding, mounting, and ejecting the scan disk
 
-One known issue is that USB input devices only work if they are plugged in before Pi Scan starts. If you plug them in later on or if they get unplugged, then you will have to restart Pi Scan to get them to work.
+Pi Scan 2 requires Python 3.13. The installer looks for `python3.13` specifically, so earlier versions will not install. The package metadata accepts later versions, but they are neither tested nor listed as supported. [INSTALL.md](INSTALL.md) lists the exact software this release needs.
 
-## Mouse
+CHDK support is an essential part of the hardware application. Pi Scan always looks for CHDK cameras first. `gphoto2` is only needed for DSLR and mirrorless cameras, and is tried only when no CHDK camera answers. A session does not mix CHDK and gPhoto2 cameras.
 
-Pi Scan can be controlled entirely via a mouse and HDMI screen. This option is incompatible with touch but works with all other kinds of input. If you intend to use a mouse, download the mouse-compatible image of Pi Scan below.
+## Input Device Options
 
-## Touch Screen
+Avoid a USB hub if at all possible. In the original Pi Scan a substantial share of reported problems turned out to be hub-related, and went away once the devices were connected to the Raspberry Pi directly.
 
-Pi Scan works with the official Raspberry Pi touch screen. This provides a more compact and self-contained scanner appliance. The touch option is incompatible with mouse input. If you want to use a touch screen, download the touchscreen-compatible image of Pi Scan.
+### Touch Screen or Mouse
 
-## Keyboard
+The graphical interface can be operated by touch or with a mouse. As in Pi Scan 1.5, the two
+are alternatives chosen once for the console rather than at runtime: a mouse and any HDMI
+screen, or the official Raspberry Pi touchscreen. Set `PI_SCAN_INPUT` in
+`/etc/default/pi-scan` to `mouse` or `touch`, or pass `--input` when running the command
+directly. The touch setting adds the mtdev provider that panel needs.
 
-Pi Scan can now be controlled entirely via a keyboard. Every button has a hotkey shown, usually a number. The keyboard works with both the touch screen and mouse versions of Pi Scan. To navigate previews with a keyboard, use '+', '-', and '0' to set the zoom level and move the viewport with WASD or the arrow keys. When scanning, use the space bar, 'b' or 'c' to capture.
+### Keyboard
 
-## USB Foot Pedal
+The scanner can be operated entirely from a keyboard. Enter performs the main action shown on the current screen. Tab swaps the odd and even cameras before focus is locked. Use `+`, `-`, and `0` to enlarge, reduce, and reset the preview; pan it with the arrow keys or WASD.
 
-Most cheap USB foot pedals emulate a keyboard and send the 'b' key by default. Because the 'b' key is a hot key for capture, USB foot pedals can be used to trigger page capture.
+During scanning, Space, B, or C captures a page pair. R rescans the previous pair. X starts recovery after a camera failure.
 
-## Industrial Foot Pedal
+The numeric keypad behavior from Pi Scan 1.5 is retained. Its meaning depends on the screen:
 
-Industrial foot pedals are more robust than equivalently priced USB foot pedals. But they don't have the electronics to deal with the USB protocol. They can be wired up to two pins on the Raspberry Pi and Pi Scan will treat any connection between those pins as a trigger for capture when scanning. Note that this will only capture images on the scanning screen, not when setting focus, zoom level, or shutter speed. For details, refer to the Archivist Quill [assembly manual](http://tenrec.builders/quill/guide/electronics/pedal/).
+* `1` prepares cameras, focuses them, or starts recovery
+* `2` installs an offered update, saves a CHDK log, or turns off the cameras
+* `3` focuses, rescans, or saves a CHDK log
+* `5` swaps camera sides or finishes the book
 
-## Buttons and Microswitches
+No number key takes a photograph, so an accidental keypress cannot consume the next two page numbers.
 
-Any electrical connection between the GPIO21 and GND pins on the Raspberry Pi will cause a capture when scanning. So any button or microswitch can work as a scanning trigger if it is wired up properly.
+### USB Foot Pedal
 
-# Using Nikon 1 J5 cameras or other mirrorless/DSLRs
+Most inexpensive USB pedals present themselves as keyboards. Configure the pedal to send Space, B, or C and it will trigger a capture while the scanning screen is open.
 
-The latest version of Pi Scan includes gphoto2 and uses it to support a host of DSLR and mirrorless cameras (see [list of supported cameras](http://www.gphoto.org/proj/libgphoto2/support.php)). Scanning using a DSLR works a bit differently than using a CHDK-supported Canon point and shoot camera.
+### Industrial Foot Pedal, Button, or Microswitch
 
-With a DSLR, all configuration of the cameras including focus and zoom must be done manually by the user via the camera's standard interface. Pi Scan itself only triggers the capture of images and stores them together on the external storage. Most settings on a camera persist even when it is powered off. But if there are any settings that revert, you must be willing to reset them at the beginning of every session.
+A switch between GPIO21 and ground can be used as a capture pedal. Pi Scan configures that pin as an active-low input. The pedal takes photographs only on the scanning screen. It does nothing while zoom, shutter or focus is being set, and nothing while a capture failure is displayed, so acknowledging that failure cannot consume a page pair.
 
-An additional advantage of using gphoto-compatible cameras is that if you specify a raw image output, Pi Scan will automatically fetch and collate the raw images alongside the JPEG files.
+The application continues to accept touch and keyboard input if GPIO cannot be opened, and shows a warning instead of refusing to start.
 
-The high quality camera that we currently recommend is the Nikon 1 J5 camera. If you are unsure of which camera to get, then this is the one to pick. It is more likely to just work (it is the model of camera used for testing Pi Scan), and we are more likely to be able to provide effective support if it doesn't. In addition, it has an exceptionally long life. Many DSLRs are rated for just 100,000 shutter actuations. The Nikon 1 J5 cameras have much longer lifetimes, exceeding 1 million actuations.
+## Cameras
 
-Recommended settings for scanning with an Archivist Quill or Archivist using a Nikon 1 J5 camera:
+### CHDK Cameras
 
-- Manual mode (M on the mode dial)
-- Shutter speed: 1/15 second
-- F-Stop: 5.6
-- ISO: 100
-- White Balance: Incandescent or us a gray card for custom set
-- Image Quality: JPEG fine or NEF (RAW) + JPEGfine
-- Image Size: L (5568x3712)
-- Auto distortion control: on
-- Focus mode: AF-A -- The Nikon 1 J5 camera uses area-based autofocus which means it should work well even on pages that are mostly blank. If necessary, the Nikon 1 J5 camera also has a manual focus mode. But the manual focus must be re-done every time the camera is powered off.
-- AF-area mode: Auto-area
-- Zoom: Zoom in until all four edges of the platen are just visible. Note that the Nikon 1 J5 loses the zoom setting on power off, so this must be set every session and you may end up with a slightly different zoom value from session to session. For this reason, it is a good idea to scan a whole book in a single session rather than splitting it between sessions.
+CHDK must already be installed on each camera and must boot when the camera is turned on. Install the complete CHDK build made for the camera's exact Canon firmware version. A build for a model with a similar name, or even for a different firmware revision of the same model, is not a substitute.
 
-# Download
+Pi Scan communicates with CHDK through the `chdkptp` command-line client. Each camera must:
 
-Both Raspberry Pi 2 and Raspberry Pi 3 are supported. There are two variants. One version supports mouse input and any HDMI screen. The other version supports the official Raspberry Pi touch screen:
+* appear in `chdkptp -r -elist` with a stable serial number
+* support remote Lua commands
+* report its optical zoom steps
+* support autofocus locking
+* return a JPEG through CHDK remote capture
 
-* [Raspberry Pi Image (for mouse)](http://tenrec.builders/pi-scan/latest/pi-scan-latest-mouse.zip)
-* [Raspberry Pi Image (for touchscreen)](http://tenrec.builders/pi-scan/latest/pi-scan-latest-touch.zip)
+Configuration is stored by serial number, not by USB socket. This lets the cameras be unplugged without losing their odd/even assignment. A camera reporting `s=nil` is refused because a bus address would change whenever it was reconnected.
 
-Two models of cameras are supported. Download the appropriate image for your camera:
+CHDK supports many Canon cameras, but not every CHDK port necessarily provides every operation Pi Scan needs. Before relying on a new camera model, test the commands above with both cameras connected and make several complete page captures. A CHDK splash screen proves that CHDK booted; it does not by itself prove remote-capture compatibility.
 
-* [Canon PowerShot A2500 Image](http://tenrec.builders/pi-scan/latest/pi-scan-camera-a2500-latest.zip)
-* [Canon PowerShot ELPH/IXUS 160 image](http://tenrec.builders/pi-scan/latest/pi-scan-camera-elph160-latest.zip)
+### DSLR and Mirrorless Cameras
 
-Use these images at your own risk. These images may damage your camera. During early testing of the ELPH 160 image, one camera was bricked and the root cause of this problem was never definitively found. See [this link](http://chdk.setepontos.com/index.php?topic=12321.140).
+When no CHDK camera is found, Pi Scan can use two cameras reported by `gphoto2`. Focus, optical zoom, and most camera setup remain under the control of the camera itself. Set both cameras up before starting and remember that some settings, particularly zoom and manual focus, may be lost when a camera is powered off.
 
-Other CHDK-compatible cameras may or may not work. If you want to try it out, just install the full CHDK package for the appropriate camera and firmware you use. If it works then great. If not, then you might have to dig into the debug log, code, and CHDK forums to see why not. While I don't support other camera models myself, I am willing to accept pull requests with patches to make Pi Scan compatible with other cameras.
+The gPhoto2 backend is optional; install it only when it is needed. Use `--no-gphoto` when diagnosing a CHDK scanner, so that an unrelated PTP entry cannot obscure the fault being investigated.
 
-# Installation
+## Installation
 
-The software is packaged as whole disk images which need to be flashed onto SD cards of at least 4GB in size. Because nothing is stored on these images, the speed of the card doesn't matter.
+Pi Scan 2 is distributed as a Python package rather than a complete Raspberry Pi disk image. This is less convenient than writing a single image, but the scanner is no longer fixed to the operating system that was current when the image was built.
 
-Extract the images from the archives and use an appropriate tool to write them to the cards. Do not just copy the file onto the card. This will not work and you will be sad. If you are updating the camera cards, they may be locked. Before imaging them, you must unlock them. The little switch on the left must be in the *top* position.
+The complete scanner installation is described in [INSTALL.md](INSTALL.md). From an unpacked source release or Git checkout:
 
-Image Writing Tutorials:
+```sh
+sudo sh deploy/install.sh
+```
 
-* [Windows](https://www.raspberrypi.org/documentation/installation/installing-images/windows.md)
-* [Mac](https://www.raspberrypi.org/documentation/installation/installing-images/mac.md)
-* [Linux](https://www.raspberrypi.org/documentation/installation/installing-images/linux.md)
+The installer creates an isolated environment under `/opt/pi-scan`, installs a systemd service, adds USB-camera access rules, and prepares the scanner account for GPIO and removable-media access. It refuses to run the application as root.
 
-## Writing an SD Card on Windows
+The service expects an X11 desktop session belonging to the scanner account. Read [deploy/README.md](deploy/README.md) before enabling it.
 
-You will need:
+For development, or to try the interface without cameras:
 
-* Win32 Disk Imager ([link](http://sourceforge.net/projects/win32diskimager/))
-* An SD Card Reader
-* An SD Card (make sure the SD card is unlocked. The little switch on the left must be in the *top* position)
-* A disk image downloaded from a location above
-* At least 4GB of free disk space
+```sh
+python -m pip install -e ".[dev,ui]"
+pi-scan-sim --output simulated-scans --pairs 2 --dng
+pi-scan-ui --output simulated-scans
+```
 
-The image you downloaded starts out as a compressed ZIP file. Right-click on it and select 'Extract all...' from the menu.
+The simulator creates ordinary page files and exercises the same session and publication logic used by the hardware application. It does not demonstrate that USB, GPIO, Kivy, or UDisks work on a particular Raspberry Pi.
 
-Pick a destination folder for the extracted file.
+## Preparing the Cameras and Scan Disk
 
-Insert SD Card into SD Card Reader.
+Lock each CHDK camera's SD card if that is how its boot method starts CHDK. Turn the cameras on and wait for the CHDK splash screen. If a camera asks for the date or time, disconnect USB, answer the question on the camera, and reconnect it afterwards.
 
-Run Win32 Disk Imager. You will be asked if you want to allow it to make changes, click yes.
+Confirm both cameras before starting:
 
-Inside of Win32 Disk Imager, click the little folder and find the image file you extracted before. Select it and click OK.
+```sh
+chdkptp -r -elist
+```
 
-Select the drive where the SD card is mounted in the 'device' dropdown. Open up 'My Computer' or 'File Explorer' and verify that this is the correct drive.
+There should be two entries, each with a different non-`nil` serial number.
 
-Click the 'Write' button. This will delete everything on the card and write out the contents of the image out to the drive. So be absolutely sure you are writing to the place you think you are.
+Put the scan disk in its reader before beginning. Pi Scan accepts exactly one removable USB filesystem and will not select the boot disk or a volume mounted at a system location. It creates these items on the scan disk:
 
-## Using SD Cards
+* `images/` for numbered JPEG and optional RAW files
+* `pi-scan.conf` for camera sides, zoom, and shutter choices
+* `debug/error.log` for a readable error history
+* `debug/events.jsonl` for detailed machine-readable events
+* `images/.pi-scan-previews/` for the preview and focus-inspection images
 
-Once the images are installed, you will have three SD cards. One needs to be inserted into your Raspberry Pi 2. The other cards are for your cameras. The camera cards must now be locked. The little switch on the left must be in the *bottom* position.
+Existing numbered images are left alone. A new session continues with the next even page number, so a book can be scanned over more than one session as long as its files remain on the disk.
 
-When you turn on the cameras, a CHDK splash screen will briefly appear. This is how you know that everything went ok. If you do not see the splash screen, the cards are not locked or there was some other problem imaging the cards.
+## Usage
 
-Sometimes when you turn on the cameras, a screen appears asking you to set the time and timezone. This will happen the first time you turn on the cameras, or if they have been unplugged for a long time. If this happens, disconnect the USB cable from the camera, use the keypad to set the date and time and dismiss these screens, then replug in the USB cable.
+Start the installed service with:
 
-Plug the cameras into the Pi. Plug the SD card reader into the Pi. Plug a monitor, mouse, and (optional) keyboard into the Pi. Turn on the Pi. Note that there is no network mode for this software. It operates by directly connecting I/O devices into the Pi.
+```sh
+sudo systemctl enable --now pi-scan.service
+```
 
-# Usage
+For a temporary hardware run from a development checkout, use:
 
-For an overview of how to use Pi Scan, see the [tutorial video](https://vimeo.com/150385938).
+```sh
+python -m pip install -e ".[ui,hardware]"
+pi-scan-ui --hardware
+```
 
-The Pi Scan operating system is completely read only. Everything is saved onto an external SD card that you can put into the SD card reader. Debug logs, configuration, and the actual scanned images all end up there. Whenever you go back to the start screen, Pi Scan will unmount the disk in the card reader so you can remove it safely or turn off the Pi.
+Pi Scan waits for the scan disk, verifies that it can write to it, and then searches for the cameras. Both cameras must be present before scanning begins.
 
-There are many camera settings which are not yet user-configurable. These settings are set to values which assume you are using an Archivist book scanner.
+### Scanning Steps
 
-## Scanning Steps
+1. Insert the scan disk and turn on both cameras. Wait for CHDK to finish booting before connecting them if that is what their boot method requires.
+2. Start Pi Scan. Check that it shows the expected scan disk and exactly two cameras.
+3. Assign the cameras to the odd and even pages. If they are reversed, swap them before focusing. The assignments are saved by camera serial number.
+4. Adjust zoom and shutter speed if necessary. Test photographs do not consume page numbers, so this is the right time to experiment.
+5. Put two pages with plenty of printed detail against the platen and focus the cameras. Pi Scan autofocuses once and then locks focus for the scanning session.
+6. Enlarge and pan the previews to inspect focus. Beyond 1:1 magnification the application shows a window cut from the original pixels rather than enlarging a reduced preview.
+7. Put the book in position and press the pedal, Space, B, or C. Both cameras capture at once. Pi Scan publishes neither page unless both JPEGs are valid.
+8. Turn the page while the images are being processed. Check the first few pairs carefully and keep checking at intervals, because a camera that has shifted is otherwise not discovered until the book is finished.
+9. Use Rescan if the previous pair is blurred, obstructed, or otherwise wrong. The old pair is kept unless its replacement is completely written.
+10. Select Finish when the book is done. Pi Scan waits for outstanding writes, synchronizes the disk, and ejects it. Do not remove the scan disk until the application says it is safe.
 
-1. Boot up the Raspberry Pi. Once the Pi itself has booted you will see the Pi Scan starting screen. When on this screen, Pi Scan will eject your external disk so you can remove it. If you need to, you can also quit to console and log in using the username 'pi' and password 'raspberry' but for most users this won't be necessary.
-1. On the disk configuration page Pi Scan searches for and mounts your external storage. The external storage is used for configuration, debugging logs, and it is where the scanned images are saved. Plug in your USB drive or SD Card Reader and SD Card. After a few seconds, your drive will be detected and you will be able to tap next. If your drive is not detected, try unplugging and replugging the device.
-1. On the camera configuration page Pi Scan searches for two cameras attached via USB to the Pi. Once it finds them, you will be able to move on to the next step or, optionally, to set a zoom level for each camera.
-1. (Optional) Zoom settings can be set for each camera individually. Tap "test shot" to capture a photo from each camera and then adjust the zoom settings in the upper left and upper right corners. Don't worry if the pages are on the wrong side for now. When you've set the zoom level you like, tap done. The zoom setting is saved to the external storage, so as long as you keep using the same card, you won't have to re-adjust these settings.
-1. (Optional) Shutter speed can be set for each camera. If your photos are consistently too underexposed or overexposed, tweak the shutter speed.
-1. In order to keep camera focus consistent, Pi Scan will auto-focus once in each session and then lock that focus for the remainder of the shots. In order to get the best focus shot, you will want to press two pages against the platen of your scanner just as if you were scanning them and then tap 'Refocus'. Make sure that these pages have lots of text since the cameras have trouble focusing on just white space. Verify on the preview that the focus is good. You will also want to verify that the 'odd' page is pointing to an odd numbered page in your book and that the 'even' page is pointing to an even numbered page. If they are not, you can tap "swap" to swap the two pages. This will ensure that the pages are interleaved properly when scanning.
-1. During scanning, press pages against the platen and tap the 'Capture' button. After hearing the shutters on the camera, you can flip to the next page while Pi Scan is processing the photos. On your first scan, you will want to verify that everything looks good. You should also check periodically as you scan, epsecially for your first few books using Pi Scan. If you notice a problem during the scan, you can recapture the last two pages with the 'Rescan' button.
-1. Once scanning is complete, tap 'Done' to return to the start screen. Here you can remove your external storage and move the files from it to your computer. If you are scanning the same book in multiple sessions, Pi Scan will continue numbering images where you left off. If you move all of the images from the external storage, it will start saving at '0000.jpg' again.
+Before every capture Pi Scan keeps a free-space reserve of 256 MiB. The hardware command's `--minimum-free-mib` option changes that value when a different reserve is appropriate. `--storage-timeout` makes the wait for a scan disk finite instead of indefinite, and `--no-gpio` disables the GPIO pedal when no switch is wired.
 
-## After Capture
+### After Capture
 
-Pi Scan does just one part of the overall scanning workflow: managing capture. After using Pi Scan, you will have an SD card full of consecutively named JPEG files. Turning those files into an e-book is a process called Post Processing. There are many different kinds of software that can help you do this task. A good open source option is called ScanTailor.
+Pi Scan controls capture only. The scan disk will contain alternating odd and even JPEG files named `0000.jpg`, `0001.jpg`, and so on. Cropping, deskewing, page cleanup, OCR, and assembly into PDF or another format are separate post-processing jobs. ScanTailor and similar programs can perform much of that work.
 
 ## Troubleshooting
 
-In an ideal world, we wouldn't have to deal with this. In case you run into less than ideal circumstances, Pi Scan will produce error logs and messages to help you diagnose any problems you encounter. Pi Scan was designed to be robust in the presence of problems so if you do run into errors you should be able to get back to scanning with a minimum of fuss. 
+Pi Scan records both a readable error history and detailed machine-readable events on the scan disk. Start with `debug/error.log`; use `debug/events.jsonl` when that is not enough.
+
+### A Camera Is Missing
+
+Run `chdkptp -r -elist` as the same account that runs Pi Scan. Check that both cameras are powered on, CHDK has booted, and neither camera is waiting for its date and time to be set. Desktop photo importers can claim a PTP camera before `chdkptp` reaches it; close or disable them.
+
+If the application says a camera has no serial number, inspect the `s=` field from `chdkptp`. Pi Scan cannot safely remember a camera by a temporary USB bus address.
 
 ### Capture Failure
 
-Sometimes a camera might return an empty photograph or otherwise not capture successfully. When this happens, Pi Scan will notify you and neither camera image will be saved to disk. Tap 'Ok' on the notification and then tap 'Capture' to try again. If you notice this happening more frequently, note down the error that you see and notify help at tenrec dot builders about the issue. Occasionally, a camera might get into a bad state where every attempted capture fails. If a few captures in a row fail, try turning the camera off and on by hand.
+If either camera returns an empty or invalid photograph, neither half of the pair is added to the book. Acknowledge the error, recover the cameras if requested, refocus, and try the pair again. Repeated failures usually call for power-cycling the affected camera and checking its USB cable.
 
-### Camera Crash
+CHDK cameras sound their failure tone when possible. The recovery screen can also save the camera ROM log under `debug/` on the scan disk.
 
-Occasionally, a camera will crash or get disconnected. Pi Scan cannot tell the difference between these two events so it always assume that getting disconnected is a crash. When Pi Scan thinks there has been a crash, it pops up a camera debug screen. It will tell you which camera is disconnected, and the last thing it was trying to do when it happened. Reconnect or power cycle the camera and it should detect that the camera is back online. When the camera is back, you can tap 'Get Debug Log' and it will save the debug log for the most recent crash to your external storage in the debug directory. You can send this debug log and the error message you saw on the debug screen to help at tenrec dot builders.
+### The Scan Disk Is Missing
 
-Once all cameras are connected again, you can tap 'Ok' to get back to scanning. You will need to go through the 'refocus' screen again first to make sure that the focus is set properly.
+Only one removable USB filesystem may be attached. Remove spare card readers and USB disks. Pi Scan will not use a volume that contains the running system, even if Linux labels that volume removable.
 
-### Pi Scan Crash
+If mounting asks for an administrator password, the scanner account does not have the required UDisks authorization. Do not solve this by running Pi Scan as root. Follow the UDisks notes in [deploy/README.md](deploy/README.md).
 
-Hopefully you will never see Pi Scan itself crashe, but if you do there is a special crash debug page which shows what happened. Send a photograph of this page to help at tenrec dot builders so it can get fixed.
+### Finish Cannot Eject the Disk
 
-### Error Log
+Wait a moment and try Finish again. Large writes may still be reaching the device. Pi Scan retries normal ejection before attempting a forced unmount. If that also fails, the interface stays open rather than reporting that removal is safe.
 
-An error log of every camera failure and crash is saved to your removable storage. This means that even if you tap Ok quickly and miss the message, you can still go back and see the details later. If you are getting persistent failures or problems, it is worth sending this error log to help at tenrec dot builders.
+### The Service Runs but No Window Appears
 
-### Rebooting
+Check the service log:
 
-Always rememeber that you cannot corrupt Pi Scan by rebooting so if there are ever any problems you cannot resolve or the system stops responding completely, you can always just unplug and replug the Raspberry Pi to get back to scanning. The only danger is that your external storage will not have been unmounted cleanly so if you do have to pull the power and reboot be sure to check the scans you have already made to make sure they are all there and that you can open them normally. 
+```sh
+journalctl -u pi-scan.service -f
+```
 
-# Version Notes
+Then check the desktop session with `echo $XDG_SESSION_TYPE`. The service is configured for X11, so any other result means the deployment does not match the session; see [deploy/README.md](deploy/README.md).
 
-- 1.5 -- Added support for gphoto2 ([list of supported cameras](http://www.gphoto.org/proj/libgphoto2/support.php)), SD cards larger than 32 GB.
-- 1.0 -- Added shutter speed adjustment, support for trigger via GPIO pins, full keyboard support, touch screen support, an upgrade mechanism, beep on error, focus when zooming, many crashes, and more.
-- 0.7 -- Added page numbers during capture. Fixed ISO and shutter speed settings. Attempt to fix camera crashes when entering alt mode. Add Pi Scan crash detection for preview and camera threads.
-- 0.6 -- Fixed preview rotation. Images were being shown upside down.
-- 0.5 -- Fixed page numbering issues. Added zoom adjustment UI.
-- 0.4 -- Detect when the /debug and /images directories fail to get created and note the problem in the storage screen.
-- 0.3 -- Add more crash detection and a screen which displays the error in case of unexpected exceptions
-- 0.2 -- Fix issues with spaces in path names and when writing error logs.
-- 0.1 -- Initial release
+### Pi Scan Stops Unexpectedly
+
+Keep the scan disk inserted and copy `debug/error.log` and `debug/events.jsonl` before starting over. Existing published page pairs remain intact. Temporary or recovery files are also retained when deleting them would risk losing the only copy of an image.
+
+## Updating
+
+An update can be installed normally with `pip`, as described in [INSTALL.md](INSTALL.md). Pi Scan can also offer an update wheel placed on the scan disk in a file named `pi-scan-update-<major>.<minor>.archive`. The archive must contain exactly one Pi Scan wheel whose version agrees with the archive name.
+
+Installing an update from removable media runs code from that media. Pi Scan therefore never installs it silently. Only accept an update from a source you trust.
+
+## Version Notes
+
+### 2.0.0
+
+* Rewritten for modern Python while retaining the Pi Scan 1.5 scanning workflow
+* Replaced the embedded Python/Lua camera bridge with supervised `chdkptp` commands
+* Preserved serial-based camera configuration, zoom and shutter choices, page naming, keypad controls, focus locking, failure tones, ROM logs, and removable-media updates
+* Added transactional paired capture and rescan so incomplete page pairs are not published
+* Added a simulator, automated tests, structured diagnostics, packaging, and deployment files
+
+For detailed changes from the Python 2 appliance, see [MIGRATION.md](MIGRATION.md) and [CHANGELOG.md](CHANGELOG.md).

@@ -8,6 +8,7 @@ __pycache__/
 # Distribution / packaging
 .Python
 env/
+.venv*/
 build/
 develop-eggs/
 dist/
@@ -39,6 +40,8 @@ htmlcov/
 .coverage
 .coverage.*
 .cache
+.pytest_cache/
+.pyright/
 nosetests.xml
 coverage.xml
 *,cover

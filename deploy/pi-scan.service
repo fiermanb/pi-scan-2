@@ -1,0 +1,21 @@
+[Unit]
+Description=Pi Scan Python 3.13 book-scanner appliance
+After=graphical.target udisks2.service
+Wants=udisks2.service
+
+[Service]
+Type=simple
+User=@PI_SCAN_USER@
+Group=pi-scan
+SupplementaryGroups=gpio plugdev
+EnvironmentFile=-/etc/default/pi-scan
+# X11 session assumed; see deploy/README.md for the untested Wayland case.
+Environment=XAUTHORITY=%h/.Xauthority
+ExecStart=/opt/pi-scan/venv/bin/pi-scan-ui --hardware
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=90
+KillSignal=SIGINT
+
+[Install]
+WantedBy=graphical.target
